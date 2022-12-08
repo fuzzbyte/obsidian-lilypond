@@ -9,8 +9,8 @@ interface MyObsidianLilyPondSettings {
 }
 
 const DEFAULT_SETTINGS: MyObsidianLilyPondSettings = {
-	lilyPondFolderName: 'lilyPond',
-	lilyPondLogLevel: 'INFO',
+	lilyPondFolderName: '_lilyPond',
+	lilyPondLogLevel: 'ERROR',
 }
 
 // Turns on/off console debug lines.
@@ -33,6 +33,7 @@ export default class MyPlugin extends Plugin {
 		this.registerMarkdownCodeBlockProcessor("lilypond", async (source, el, ctx) => {
 
 			log(source);
+			debugger;
 			///////////////////////////////////////////////////////////////////////////////////////
 			//	Empty Block and Filename Check
 			///////////////////////////////////////////////////////////////////////////////////////
@@ -57,53 +58,6 @@ export default class MyPlugin extends Plugin {
 				lilyPondCachedDiv.innerText = "Empty LilyPond block - Please add some LilyPond!";
 				return;
 			}
-
-			///////////////////////////////////////////////////////////////////////////////////////
-			//	First, let's identify the codeblock index of this lilypond source.
-			//  This helps us generate unique .ly filenames futher down.
-			///////////////////////////////////////////////////////////////////////////////////////
-
-
-			const currentNote = this.app.workspace.getActiveFile();
-			//@ts-ignore
-			const noteText = await this.app.vault.cachedRead(currentNote);
-
-			const regex = new RegExp(/(?<=```lilypond)([^]*?)(?=```)/g);
-			const matches = noteText.match(regex);
-
-			//log("Matches\n" + matches);
-
-			if (matches == null) {
-				// Catastrophic failure - how is there no lilypond block?
-				log("Somehow, there's no lilypond block in the file!");
-				return
-			}
-
-			// Because there may be multiple lilyPond code blocks in the file and each one needs its own .ly file,
-			// Let's identify what index codeblock is the one we're working with.
-			let lpCodeBlockIndex;
-			for (lpCodeBlockIndex = 0; lpCodeBlockIndex < matches.length; lpCodeBlockIndex++) {
-
-				log("Comparing to codeblock: " + matches[lpCodeBlockIndex].trim());
-				if (matches[lpCodeBlockIndex].trim() == source.trim()) {
-					log("Codeblock index match at:" + lpCodeBlockIndex);
-					break;
-				}
-			}
-
-			// Obsidian seems to be calling this post processor for every character entered in markdown in a LilyPond code block.
-			// That's a lot of calls into this, and in those instances when you're still editing the codeblock, the previous file
-			// read is not "caught up" to what the user has entered, and the source passed in will never match.
-			// In that instance phantom .ly files were being created with an index one too high, causing problems for the next block 
-			// down.
-			// By ensuring we always find a match here, we're never going to "goof up" and create a .ly file for a block that doesn't
-			// exist yet.
-			//if (lpCodeBlockIndex == matches.length) {
-			//	log("Returning. Likely fired from a still-being-edited codeblock.");
-			//	return;
-			//}
-
-
 
 			///////////////////////////////////////////////////////////////////////////////////////
 			//	Path Variable Setups:
@@ -137,12 +91,12 @@ export default class MyPlugin extends Plugin {
 			// Without the check on active_path, if we were in the root directory, there'd be a preceding slash that 
 			// impacts the call to getAbstractFileByPath.
 			const dotLYSourceFilePath = active_folder_path != "" ?
-				`${active_folder_path}/${this.settings.lilyPondFolderName}/${dotLYSourceFileNameWithExtension}` :
+				`${this.settings.lilyPondFolderName}/${active_folder_path}/${dotLYSourceFileNameWithExtension}` :
 				`${this.settings.lilyPondFolderName}/${dotLYSourceFileNameWithExtension}`;
 
 			// Set here so it's accessible in the lilypond exec callback.
 			const settingsLilyPondFolderName = this.settings.lilyPondFolderName;
-
+ 
 			log(`active_note_file_path:\n${active_note_file_path}`); // path + filename
 			log(`active_folder_path:\n${active_folder_path}`); // path from root (no preceding slash)
 			log(`note_name_no_ext:\n${note_name_no_ext}`); // Just the note name without .md.
@@ -164,7 +118,7 @@ export default class MyPlugin extends Plugin {
 
 			const lilyPondImagePreviewFilePath = active_folder_path == "" ?
 			 	`${settingsLilyPondFolderName}/${dotLYSourceFileNameNoExtension}.preview.png` :
-			 	`${active_folder_path}/${settingsLilyPondFolderName}/${dotLYSourceFileNameNoExtension}.preview.png`;
+			 	`${settingsLilyPondFolderName}/${active_folder_path}/${dotLYSourceFileNameNoExtension}.preview.png`;
 
 			const lilyPondAbsolutePreviewURI = `app://local/${app.vault.adapter.basePath}/${lilyPondImagePreviewFilePath}`;
 
@@ -173,7 +127,7 @@ export default class MyPlugin extends Plugin {
 			// 	`${active_folder_path}/${settingsLilyPondFolderName}/${dotLYSourceFileNameNoExtension}.mid`;
 
 
-			// Load the png preview if it exists
+			// Load the png preview if it exists already.
 			if (this.app.vault.getAbstractFileByPath(lilyPondImagePreviewFilePath) != null) {
 				const lilyPondCachedImage = lilyPondCachedDiv.createEl("img");
 				// Inject a random query string, otherwise the image gets cached by the "browser" and not reloaded from the newly generated file.
@@ -215,16 +169,17 @@ export default class MyPlugin extends Plugin {
 			const lilyPondFolder = this.app.vault.getAbstractFileByPath(
 				active_folder_path == "" ?
 					this.settings.lilyPondFolderName :
-					`${active_folder_path}/${this.settings.lilyPondFolderName}`);
+					`${this.settings.lilyPondFolderName}/${active_folder_path}`);
 
 			console.log(lilyPondFolder);
 
 			// Create the subfolder for the lilyPond files.
 			if (lilyPondFolder == null) {
-				await this.app.vault.createFolder(`${active_folder_path}/${this.settings.lilyPondFolderName}`);
+				await this.app.vault.createFolder(`${this.settings.lilyPondFolderName}/${active_folder_path}`);
 			}
 
 			let lilyPondSourceFile = this.app.vault.getAbstractFileByPath(dotLYSourceFilePath);
+
 			if (lilyPondSourceFile != null) {
 				await this.app.vault.delete(lilyPondSourceFile, true);
 			}
@@ -250,7 +205,7 @@ export default class MyPlugin extends Plugin {
 			// Build the current working directory for LilyPond, which should be the subfolder specified in settings.
 			const lilyPondCurrentWorkingDirectory = active_folder_path == "" ?
 				vaultBasePath + "/" + this.settings.lilyPondFolderName :
-				vaultBasePath + "/" + active_folder_path + "/" + this.settings.lilyPondFolderName;
+				vaultBasePath + "/" + this.settings.lilyPondFolderName + "/" + active_folder_path;
 
 			//@ts-ignore
 			const exec = require('child_process').exec;
@@ -288,11 +243,6 @@ export default class MyPlugin extends Plugin {
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new LilyPondSettingTab(this.app, this));
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => log('setInterval'), 5 * 60 * 1000));
-
-
-
 	}
 
 	onunload() {
@@ -329,9 +279,9 @@ class LilyPondSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Output File Subfolder Name')
-			.setDesc('By default, .ly files and output from LilyPond compilation are stored in a lilyPond subfolder beneath your notes. You can change the name of the directory here.')
+			.setDesc('By default, .ly files and output from LilyPond compilation are stored in a lilyPond subfolder beneath your notes. You can change the name of the directory here. Do not start the directory name with "."')
 			.addText(text => text
-				.setPlaceholder('lilyPond')
+				.setPlaceholder('_lilyPond')
 				.setValue(this.plugin.settings.lilyPondFolderName)
 				.onChange(async (value) => {
 					log('Secret: ' + value);
@@ -343,7 +293,7 @@ class LilyPondSettingTab extends PluginSettingTab {
 			.setName('Log Level')
 			.setDesc('Change the Log Level of the LilyPond compiler here [NONE, ERROR, WARN, BASIC_PROGRESS, INFO, DEBUG')
 			.addText(text => text
-				.setPlaceholder('INFO')
+				.setPlaceholder('ERROR')
 				.setValue(this.plugin.settings.lilyPondLogLevel)
 				.onChange(async (value) => {
 					log('Secret: ' + value);
