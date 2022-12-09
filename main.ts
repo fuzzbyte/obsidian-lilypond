@@ -1,4 +1,4 @@
-import { App, Editor, Plugin, PluginSettingTab, Setting, } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, } from 'obsidian';
 
 
 // Remember to rename these classes and interfaces!
@@ -17,23 +17,20 @@ const DEFAULT_SETTINGS: MyObsidianLilyPondSettings = {
 const DEBUG = false;
 
 function log(msg) {
-	if (DEBUG)
-	{
+	if (DEBUG) {
 		console.log(msg);
 	}
-
 }
 
 export default class MyPlugin extends Plugin {
 	settings: MyObsidianLilyPondSettings;
-	
+
 	async onload() {
 		await this.loadSettings();
 
 		this.registerMarkdownCodeBlockProcessor("lilypond", async (source, el, ctx) => {
 
 			log(source);
-			debugger;
 			///////////////////////////////////////////////////////////////////////////////////////
 			//	Empty Block and Filename Check
 			///////////////////////////////////////////////////////////////////////////////////////
@@ -44,18 +41,17 @@ export default class MyPlugin extends Plugin {
 				return;
 			}
 
-			if (!source.startsWith("%"))
-			{
+			if (!source.startsWith("%") || !source.split("\n",1)[0].trim().endsWith(".ly")) {
 				const lilyPondCachedDiv = el.createDiv();
-				lilyPondCachedDiv.innerHTML = "Block must start with a comment with a unique filename within this note such as: <pre>% MyScore</pre>";
+				lilyPondCachedDiv.innerHTML = "Your block must start with a comment and unique .ly filename within this note such as: <pre>% MyScore.ly</pre>";
 				return;
 			}
 
+
 			// Check to ensure we have at least 2 lines, and the first starts with a %.
-			if (source.startsWith("%") && (source.trim().split("\n").length == 1))
-			{
+			if (source.startsWith("%") && source.split("\n",1)[0].trim().endsWith(".ly") && (source.trim().split("\n").length == 1)) {
 				const lilyPondCachedDiv = el.createDiv();
-				lilyPondCachedDiv.innerText = "Empty LilyPond block - Please add some LilyPond!";
+				lilyPondCachedDiv.innerText = "Filename set, time to write some Lilypond!";
 				return;
 			}
 
@@ -85,9 +81,9 @@ export default class MyPlugin extends Plugin {
 			const note_name_no_ext = this.app.workspace.getActiveFile()?.basename;
 
 			// Determine the .ly source filename for this codeblock.
-			const dotLYSourceFileNameNoExtension = `${source.split("\n")[0].substring(1).trim()}`;
-			const dotLYSourceFileNameWithExtension = `${dotLYSourceFileNameNoExtension}.ly`;
-
+			const dotLYSourceFileNameWithExtension = `${note_name_no_ext}_${source.split("\n")[0].substring(1).trim()}`;
+			const dotLYSourceFileNameNoExtension = `${dotLYSourceFileNameWithExtension}`.slice(0,-3);
+			
 			// Without the check on active_path, if we were in the root directory, there'd be a preceding slash that 
 			// impacts the call to getAbstractFileByPath.
 			const dotLYSourceFilePath = active_folder_path != "" ?
@@ -96,7 +92,7 @@ export default class MyPlugin extends Plugin {
 
 			// Set here so it's accessible in the lilypond exec callback.
 			const settingsLilyPondFolderName = this.settings.lilyPondFolderName;
- 
+
 			log(`active_note_file_path:\n${active_note_file_path}`); // path + filename
 			log(`active_folder_path:\n${active_folder_path}`); // path from root (no preceding slash)
 			log(`note_name_no_ext:\n${note_name_no_ext}`); // Just the note name without .md.
@@ -117,8 +113,8 @@ export default class MyPlugin extends Plugin {
 			// 		where local is hardcoded.
 
 			const lilyPondImagePreviewFilePath = active_folder_path == "" ?
-			 	`${settingsLilyPondFolderName}/${dotLYSourceFileNameNoExtension}.preview.png` :
-			 	`${settingsLilyPondFolderName}/${active_folder_path}/${dotLYSourceFileNameNoExtension}.preview.png`;
+				`${settingsLilyPondFolderName}/${dotLYSourceFileNameNoExtension}.preview.png` :
+				`${settingsLilyPondFolderName}/${active_folder_path}/${dotLYSourceFileNameNoExtension}.preview.png`;
 
 			const lilyPondAbsolutePreviewURI = `app://local/${app.vault.adapter.basePath}/${lilyPondImagePreviewFilePath}`;
 
@@ -235,6 +231,10 @@ export default class MyPlugin extends Plugin {
 				log(`stdout:\n${stdout}`);
 				log(`stderr:\n${stderr}`);
 
+
+
+
+
 			});
 
 		});
@@ -242,6 +242,25 @@ export default class MyPlugin extends Plugin {
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new LilyPondSettingTab(this.app, this));
+
+
+		// Sometimes there are leftover temp files in the directory. Let's find and remove those.
+		// This happens when lilypond is firing often due to real-time compilation on entry and 
+		// you have file conflicts. Give things a few seconds, and then check for cleanup.
+		// The pattern is tmp--tmp-{number}
+		this.registerInterval(window.setInterval(() => {
+		
+						const allLoadedFiles = this.app.vault.getAllLoadedFiles();
+						const tempFiles = allLoadedFiles.filter(f => f.path.startsWith(this.settings.lilyPondFolderName + "/") && f.name.startsWith("tmp--tmp") && f.deleted == false);
+						log("Checking for tempfiles.");
+
+						for (let tempFile of tempFiles) {
+							log("Removing tempfile: " + tempFile);
+							app.vault.delete(tempFile);
+						}
+		
+					}, 5 * 60 * 1000));
+
 
 	}
 
