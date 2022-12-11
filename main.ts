@@ -1,4 +1,5 @@
-import { App, Plugin, PluginSettingTab, Setting, } from 'obsidian';
+import { debug } from 'console';
+import { App, Plugin, PluginSettingTab, Setting, MarkdownView } from 'obsidian';
 
 
 // Remember to rename these classes and interfaces!
@@ -14,7 +15,7 @@ const DEFAULT_SETTINGS: MyObsidianLilyPondSettings = {
 }
 
 // Turns on/off console debug lines.
-const DEBUG = false;
+const DEBUG = true;
 
 function log(msg) {
 	if (DEBUG) {
@@ -41,7 +42,7 @@ export default class MyPlugin extends Plugin {
 				return;
 			}
 
-			if (!source.startsWith("%") || !source.split("\n",1)[0].trim().endsWith(".ly")) {
+			if (!source.startsWith("%") || !source.split("\n", 1)[0].trim().endsWith(".ly")) {
 				const lilyPondCachedDiv = el.createDiv();
 				lilyPondCachedDiv.innerHTML = "Your block must start with a comment and unique .ly filename within this note such as: <pre>% MyScore.ly</pre>";
 				return;
@@ -49,7 +50,7 @@ export default class MyPlugin extends Plugin {
 
 
 			// Check to ensure we have at least 2 lines, and the first starts with a %.
-			if (source.startsWith("%") && source.split("\n",1)[0].trim().endsWith(".ly") && (source.trim().split("\n").length == 1)) {
+			if (source.startsWith("%") && source.split("\n", 1)[0].trim().endsWith(".ly") && (source.trim().split("\n").length == 1)) {
 				const lilyPondCachedDiv = el.createDiv();
 				lilyPondCachedDiv.innerText = "Filename set, time to write some Lilypond!";
 				return;
@@ -82,8 +83,8 @@ export default class MyPlugin extends Plugin {
 
 			// Determine the .ly source filename for this codeblock.
 			const dotLYSourceFileNameWithExtension = `${note_name_no_ext}_${source.split("\n")[0].substring(1).trim()}`;
-			const dotLYSourceFileNameNoExtension = `${dotLYSourceFileNameWithExtension}`.slice(0,-3);
-			
+			const dotLYSourceFileNameNoExtension = `${dotLYSourceFileNameWithExtension}`.slice(0, -3);
+
 			// Without the check on active_path, if we were in the root directory, there'd be a preceding slash that 
 			// impacts the call to getAbstractFileByPath.
 			const dotLYSourceFilePath = active_folder_path != "" ?
@@ -118,9 +119,9 @@ export default class MyPlugin extends Plugin {
 
 			const lilyPondAbsolutePreviewURI = `app://local/${app.vault.adapter.basePath}/${lilyPondImagePreviewFilePath}`;
 
-			// const lilyPondMidiFilePath = active_folder_path == "" ?
-			// 	`${settingsLilyPondFolderName}/${dotLYSourceFileNameNoExtension}.mid` :
-			// 	`${active_folder_path}/${settingsLilyPondFolderName}/${dotLYSourceFileNameNoExtension}.mid`;
+			const lilyPondMidiFilePath = active_folder_path == "" ?
+				`${settingsLilyPondFolderName}/${dotLYSourceFileNameNoExtension}.mid` :
+				`${settingsLilyPondFolderName}/${active_folder_path}/${dotLYSourceFileNameNoExtension}.mid`;
 
 
 			// Load the png preview if it exists already.
@@ -131,17 +132,29 @@ export default class MyPlugin extends Plugin {
 			}
 
 			// Load the midi file if it exists. MIDI support is not currently working and will likely require custom JS via WebAudio or WebMIDI to work.
-			// const lilyPondAbsoluteMidiURI = `app://local/${app.vault.adapter.basePath}/${lilyPondMidiFilePath}`
-			// const lilyPondMidiFile = this.app.vault.getAbstractFileByPath(lilyPondMidiFilePath);
+			const lilyPondAbsoluteMidiURI = `obsidian://open?vault=${app.vault.getName()}&file=${encodeURI(lilyPondMidiFilePath)}`
+			const lilyPondMidiFile = this.app.vault.getAbstractFileByPath(lilyPondMidiFilePath);
 
-			// if (lilyPondMidiFile != null)	
-			// {	
-			// 	const lilyPondCachedMidiAudioEl = lilyPondCachedDiv.createEl("audio");
-			// 	// Inject a random query string, otherwise the image gets cached by the "browser" and not reloaded from the newly generated file.
-			// 	const lilyPondCachedMidiAudioSrcEl = lilyPondCachedMidiAudioEl.createEl("source");
-			// 	lilyPondCachedMidiAudioSrcEl.src = lilyPondAbsoluteMidiURI + "?ver=" + getRandomInt(999999);
-			// 	lilyPondCachedMidiAudioSrcEl.type = "audio/midi";
-			// }
+
+			const lilyPondMidiLinkDiv = lilyPondCachedDiv.createDiv();
+
+			if (lilyPondMidiFile !== null) {
+				const lilyPondMidiLink = lilyPondMidiLinkDiv.createEl("a");
+				lilyPondMidiLink.href = lilyPondAbsoluteMidiURI;
+				lilyPondMidiLink.innerText = "MIDI File";
+			}
+
+			if (lilyPondMidiFile != null) {
+				// const lilyPondCachedMidiAudioEl = lilyPondCachedDiv.createEl("audio");
+				// // Inject a random query string, otherwise the image gets cached by the "browser" and not reloaded from the newly generated file.
+				// const lilyPondCachedMidiAudioSrcEl = lilyPondCachedMidiAudioEl.createEl("source");
+				// lilyPondCachedMidiAudioSrcEl.src = lilyPondAbsoluteMidiURI + "?ver=" + getRandomInt(999999);
+				// lilyPondCachedMidiAudioSrcEl.type = "audio/midi";
+
+				const lilyPondMidiLink = lilyPondCachedDiv.createEl("a");
+				lilyPondMidiLink.href = lilyPondAbsoluteMidiURI;
+				lilyPondMidiLink.innerText = "MIDI File";
+			}
 
 			///////////////////////////////////////////////////////////////////////////////////////
 			//	Recompiliation check - 
@@ -226,14 +239,18 @@ export default class MyPlugin extends Plugin {
 					// Inject a random query string, otherwise the image gets cached by the "browser" and not reloaded from the newly generated file.
 					lilyPondImage.src = lilyPondAbsolutePreviewURI + "?ver=" + getRandomInt(999999);
 
+					const lilyPondMidiLinkDiv = lilyPondDiv.createDiv();
+
+					if (lilyPondMidiFile !== null) {
+						const lilyPondMidiLink = lilyPondMidiLinkDiv.createEl("a");
+						lilyPondMidiLink.href = lilyPondAbsoluteMidiURI;
+						lilyPondMidiLink.innerText = "MIDI File";
+					}
+
 				}
 				log(`error:\n${error}`);
 				log(`stdout:\n${stdout}`);
 				log(`stderr:\n${stderr}`);
-
-
-
-
 
 			});
 
@@ -249,20 +266,22 @@ export default class MyPlugin extends Plugin {
 		// you have file conflicts. Give things a few seconds, and then check for cleanup.
 		// The pattern is tmp--tmp-{number}
 		this.registerInterval(window.setInterval(() => {
-		
-						const allLoadedFiles = this.app.vault.getAllLoadedFiles();
-						const tempFiles = allLoadedFiles.filter(f => f.path.startsWith(this.settings.lilyPondFolderName + "/") && f.name.startsWith("tmp--tmp") && f.deleted == false);
-						log("Checking for tempfiles.");
 
-						for (let tempFile of tempFiles) {
-							log("Removing tempfile: " + tempFile);
-							app.vault.delete(tempFile);
-						}
-		
-					}, 5 * 60 * 1000));
+			const allLoadedFiles = this.app.vault.getAllLoadedFiles();
+			const tempFiles = allLoadedFiles.filter(f => f.path.startsWith(this.settings.lilyPondFolderName + "/") && f.name.startsWith("tmp--tmp") && f.deleted == false);
+			log("Checking for tempfiles.");
+
+			for (let tempFile of tempFiles) {
+				log("Removing tempfile: " + tempFile);
+				app.vault.delete(tempFile);
+			}
+
+		}, 5 * 60 * 1000));
 
 
 	}
+
+
 
 	onunload() {
 
@@ -280,6 +299,7 @@ export default class MyPlugin extends Plugin {
 function getRandomInt(max) {
 	return Math.floor(Math.random() * max);
 }
+
 
 class LilyPondSettingTab extends PluginSettingTab {
 	plugin: MyPlugin;
