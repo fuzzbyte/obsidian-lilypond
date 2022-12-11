@@ -1,8 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting, MarkdownView } from 'obsidian';
 
-
-// Remember to rename these classes and interfaces!
-
 interface MyObsidianLilyPondSettings {
 	lilyPondFolderName: string;
 	lilyPondLogLevel: string
@@ -14,7 +11,7 @@ const DEFAULT_SETTINGS: MyObsidianLilyPondSettings = {
 }
 
 // Turns on/off console debug lines.
-const DEBUG = true;
+const DEBUG = false;
 
 function log(msg) {
 	if (DEBUG) {
@@ -66,9 +63,6 @@ export default class MyPlugin extends Plugin {
 					return;
 				}
 			}
-
-			
-
 
 			///////////////////////////////////////////////////////////////////////////////////////
 			//	Path Variable Setups:
@@ -272,7 +266,7 @@ export default class MyPlugin extends Plugin {
 
 		// Sometimes there are leftover temp files in the directory. Let's find and remove those.
 		// This happens when lilypond is firing often due to real-time compilation on entry and 
-		// you have file conflicts. Give things a few seconds, and then check for cleanup.
+		// you have file conflicts.
 		// The pattern is tmp--tmp-{number}
 		this.registerInterval(window.setInterval(() => {
 
