@@ -41,15 +41,15 @@ export default class MyPlugin extends Plugin {
 				return;
 			}
 
-			if (!source.startsWith("%") || !source.split("\n", 1)[0].trim().endsWith(".ly")) {
+			if (!source.startsWith("%") || !source.split("\n", 1)[0].trim()) {
 				const lilyPondCachedDiv = el.createDiv();
-				lilyPondCachedDiv.innerHTML = "Your block must start with a comment and unique .ly filename within this note such as: <pre>% MyScore.ly</pre>";
+				lilyPondCachedDiv.innerHTML = "Your block must start with a comment naming this block, and this name must be unique within this note, like: <pre>% MyScore</pre>";
 				return;
 			}
 
 
 			// Check to ensure we have at least 2 lines, and the first starts with a %.
-			if (source.startsWith("%") && source.split("\n", 1)[0].trim().endsWith(".ly") && (source.trim().split("\n").length == 1)) {
+			if (source.startsWith("%") && source.split("\n", 1)[0].trim() && (source.trim().split("\n").length == 1)) {
 				const lilyPondCachedDiv = el.createDiv();
 				lilyPondCachedDiv.innerText = "Filename set, time to write some Lilypond!";
 				return;
@@ -96,8 +96,8 @@ export default class MyPlugin extends Plugin {
 			const note_name_no_ext = this.app.workspace.getActiveFile()?.basename;
 
 			// Determine the .ly source filename for this codeblock.
-			const dotLYSourceFileNameWithExtension = `${note_name_no_ext}_${source.split("\n")[0].substring(1).trim()}`;
-			const dotLYSourceFileNameNoExtension = `${dotLYSourceFileNameWithExtension}`.slice(0, -3);
+			const dotLYSourceFileNameNoExtension = `${note_name_no_ext}_${source.split("\n")[0].substring(1).trim()}`;
+			const dotLYSourceFileNameWithExtension = `${dotLYSourceFileNameNoExtension}.ly`;
 
 			// Without the check on active_path, if we were in the root directory, there'd be a preceding slash that 
 			// impacts the call to getAbstractFileByPath.
