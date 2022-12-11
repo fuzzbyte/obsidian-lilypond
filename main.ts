@@ -299,7 +299,7 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-function getRandomInt(max) {
+function getRandomInt(max : number) {
 	return Math.floor(Math.random() * max);
 }
 
