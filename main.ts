@@ -1,4 +1,3 @@
-import { debug } from 'console';
 import { App, Plugin, PluginSettingTab, Setting, MarkdownView } from 'obsidian';
 
 
@@ -55,6 +54,21 @@ export default class MyPlugin extends Plugin {
 				lilyPondCachedDiv.innerText = "Filename set, time to write some Lilypond!";
 				return;
 			}
+
+			
+			// Check to ensure the user is not working in a comment line, which means there's no need to process things.
+			// Additionally, this helps to ensure if the user is editing the filename, we're not starting to generate stuff with the wrong filename.
+			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+			if (view !== null) {
+				const line = view.editor.getCursor().line;
+				const lineContent = view.editor.getLine(line);
+				if (lineContent.trim().startsWith("%")) {
+					return;
+				}
+			}
+
+			
+
 
 			///////////////////////////////////////////////////////////////////////////////////////
 			//	Path Variable Setups:
@@ -138,11 +152,6 @@ export default class MyPlugin extends Plugin {
 
 			const lilyPondMidiLinkDiv = lilyPondCachedDiv.createDiv();
 
-			if (lilyPondMidiFile !== null) {
-				const lilyPondMidiLink = lilyPondMidiLinkDiv.createEl("a");
-				lilyPondMidiLink.href = lilyPondAbsoluteMidiURI;
-				lilyPondMidiLink.innerText = "MIDI File";
-			}
 
 			if (lilyPondMidiFile != null) {
 				// const lilyPondCachedMidiAudioEl = lilyPondCachedDiv.createEl("audio");
@@ -151,7 +160,7 @@ export default class MyPlugin extends Plugin {
 				// lilyPondCachedMidiAudioSrcEl.src = lilyPondAbsoluteMidiURI + "?ver=" + getRandomInt(999999);
 				// lilyPondCachedMidiAudioSrcEl.type = "audio/midi";
 
-				const lilyPondMidiLink = lilyPondCachedDiv.createEl("a");
+				const lilyPondMidiLink = lilyPondMidiLinkDiv.createEl("a");
 				lilyPondMidiLink.href = lilyPondAbsoluteMidiURI;
 				lilyPondMidiLink.innerText = "MIDI File";
 			}
