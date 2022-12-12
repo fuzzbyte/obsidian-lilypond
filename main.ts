@@ -242,16 +242,17 @@ export default class MyPlugin extends Plugin {
 					// Inject a random query string, otherwise the image gets cached by the "browser" and not reloaded from the newly generated file.
 					lilyPondImage.src = lilyPondAbsolutePreviewURI + "?ver=" + getRandomInt(999999);
 
-					const lilyPondMidiLinkDiv = lilyPondDiv.createDiv();
+					const lilyPondMidiFile = this.app.vault.getAbstractFileByPath(lilyPondMidiFilePath);
 
-					if (lilyPondMidiFile !== null) {
+					if (lilyPondMidiFile != null) {
+						const lilyPondMidiLinkDiv = lilyPondDiv.createDiv();
 						const lilyPondMidiLink = lilyPondMidiLinkDiv.createEl("a");
 						lilyPondMidiLink.href = lilyPondAbsoluteMidiURI;
 						lilyPondMidiLink.innerText = "MIDI File";
 					}
 
 				}
-				log(`error:\n${error}`);
+				log(`error:\n${error}`);0.
 				log(`stdout:\n${stdout}`);
 				log(`stderr:\n${stderr}`);
 
