@@ -5,6 +5,6 @@
 	"minAppVersion": "0.15.0",
 	"description": "Automatically engrave and display LilyPond sheets directly in Obsidian.",
 	"author": "fuzzbyte",
-	"authorUrl": "https://obsidian.md",
+	"authorUrl": "https://github.com/fuzzbyte",
 	"isDesktopOnly": true
 }
