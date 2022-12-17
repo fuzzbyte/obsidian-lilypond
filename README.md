@@ -2,7 +2,7 @@
 
 This plugin will display LilyPond engraving output from a lilypond codeblock in Obsidian. Here's a demo:
 
-![LilyPondForObsidian](https://user-images.githubusercontent.com/8451031/206800091-5f515de8-7cef-4a58-af63-8158fe82a3b5.gif)
+![LilyPondForObsidian](https://user-images.githubusercontent.com/8451031/208253223-5daeffca-3bae-4a37-9f0c-f751060aee43.gif)
 
 ## Features
 
@@ -18,7 +18,7 @@ This plugin will display LilyPond engraving output from a lilypond codeblock in 
 ## Pair with the templates plugin for more power!
 
 ### Step 1: Create a template
-![image](https://user-images.githubusercontent.com/8451031/206926561-1307443d-b192-432a-98eb-011d90f4d4fa.png)
+![image](https://user-images.githubusercontent.com/8451031/208253296-07084912-1258-4613-9522-0d4ba91f072a.png)
 ### Step 2: Use the "Template: Insert Template" command to use the template in another file, and edit from there!
 ![image](https://user-images.githubusercontent.com/8451031/206926636-fc728a5b-51a2-48da-8f96-215fcb7c484c.png)
 ![image](https://user-images.githubusercontent.com/8451031/206926642-0d165221-eaf8-4772-8981-b4429854d391.png)
