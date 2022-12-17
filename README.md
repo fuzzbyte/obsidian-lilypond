@@ -22,7 +22,7 @@ This plugin will display LilyPond engraving output from a lilypond codeblock in 
 ### Step 2: Use the "Template: Insert Template" command to use the template in another file, and edit from there!
 ![image](https://user-images.githubusercontent.com/8451031/206926636-fc728a5b-51a2-48da-8f96-215fcb7c484c.png)
 ![image](https://user-images.githubusercontent.com/8451031/206926642-0d165221-eaf8-4772-8981-b4429854d391.png)
-![image](https://user-images.githubusercontent.com/8451031/206926685-93c42667-c47e-4ce7-a292-b77c66ce12dc.png)
+![image](https://user-images.githubusercontent.com/8451031/208253383-a239df98-40da-490f-b6a8-283d62edd04a.png)
 
 
 
@@ -34,10 +34,10 @@ This plugin will display LilyPond engraving output from a lilypond codeblock in 
 ## Usage
 
 - Create a LilyPond Codeblock using ```lilypond in edit mode.
-- Ensure each LilyPond Codeblock has a first line with a LilyPond comment indicating a .ly filename, like 
+- Ensure each LilyPond Codeblock has a first line with a LilyPond comment indicating a unique name, like 
 
 ```
-% MyScore.ly
+% MyScore
 { c' e' g' }
 ```
 
