@@ -1,73 +1,60 @@
-# Obsidian Sample Plugin
+# LilyPond for Obsidian
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+This plugin will display LilyPond engraving output from a lilypond codeblock in Obsidian. Here's a demo:
 
-This project uses Typescript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in Typescript Definition format, which contains TSDoc comments describing what it does.
+![LilyPondForObsidian](https://user-images.githubusercontent.com/8451031/206800091-5f515de8-7cef-4a58-af63-8158fe82a3b5.gif)
 
-**Note:** The Obsidian API is still in early alpha and is subject to change at any time!
+## Features
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Changes the default font color to red using `styles.css`.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+- Write LilyPond code inside of Obsidian, and see it live-render for you.
+- Configurable LilyPond Log Levels - LilyPond's errors not making any sense? Up to DEBUG mode!
+- .ly File Access - simply look in the lilyPond subdirectories to find the generated previews and .ly files for your use outside Obsidian. 
+- Easy MIDI file links that open in your default midi player, if you generate MIDI output with your score (don't forget to include the layout block too, or your score won't render!)
 
-## First time developing plugins?
-
-Quick starting guide for new plugin devs:
-
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
-
-## Releasing new releases
-
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
-
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
-
-## Adding your plugin to the community plugin list
-
-- Check https://github.com/obsidianmd/obsidian-releases/blob/master/plugin-review.md
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
-
-## How to use
-
-- Clone this repo.
-- `npm i` or `yarn` to install dependencies
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint .\src\`
+![image](https://user-images.githubusercontent.com/8451031/206927705-4ec6829e-2941-480d-9481-b6a6f85bae48.png)
 
 
-## API Documentation
 
-See https://github.com/obsidianmd/obsidian-api
+## Pair with the templates plugin for more power!
+
+### Step 1: Create a template
+![image](https://user-images.githubusercontent.com/8451031/206926561-1307443d-b192-432a-98eb-011d90f4d4fa.png)
+### Step 2: Use the "Template: Insert Template" command to use the template in another file, and edit from there!
+![image](https://user-images.githubusercontent.com/8451031/206926636-fc728a5b-51a2-48da-8f96-215fcb7c484c.png)
+![image](https://user-images.githubusercontent.com/8451031/206926642-0d165221-eaf8-4772-8981-b4429854d391.png)
+![image](https://user-images.githubusercontent.com/8451031/206926685-93c42667-c47e-4ce7-a292-b77c66ce12dc.png)
+
+
+
+## Setup
+
+- Ensure You have LilyPond installed on your computer, and lilypond is on the PATH variable. 
+  - Confirm this by opening a terminal on your computer and typing lilypond --version.
+
+## Usage
+
+- Create a LilyPond Codeblock using ```lilypond in edit mode.
+- Ensure each LilyPond Codeblock has a first line with a LilyPond comment indicating a .ly filename, like 
+
+```
+% MyScore.ly
+{ c' e' g' }
+```
+
+- In LivePreview mode, exit the codeblock, and the plugin will compile your LilyPond and display an image of the output.
+- Switching to Reading Mode will also display the output.
+
+## How it works
+
+- This plugin relies on your local lilypond instance. As you write a Lilypond block, this plugin saves the results to a .ly file and sends it to Lilypond for compliation. The output uses the "preview" .png file of Lilypond to render it in Obsidian. 
+- Lilypond files are saved as {NoteName}_{BlockName}.ly under the lilypond folder (_lilypond by default) with a directory structure built out to match your notes.
+
+## Cautions
+
+- There is no support for Obsidian Mobile, as lilypond compilation would be pretty tricky on mobile.
+- I don't have Obsidian Publish, so I have no idea if it would work there or not.
+- Extraneous files are sometimes left un-cleaned up (for example, if you change the filename of a block, or if your generated scores or MIDI files are open in another program). This plugin will not clean all files up automatically, however, it does clean up some lilypond temp files periodically in your vault. You can safely delete the lilypond directory - your lilypond scores are still safe in your markdown files, and the next time you open one of those files, output should regenerate.
+- Moving files around within folders is fine, as they should regenerate the next time you open a note - but it will not remove previously generated scores.
+
+
+

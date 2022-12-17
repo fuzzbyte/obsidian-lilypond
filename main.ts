@@ -1,82 +1,291 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, MarkdownView } from 'obsidian';
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
+interface MyObsidianLilyPondSettings {
+	lilyPondFolderName: string;
+	lilyPondLogLevel: string
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+const DEFAULT_SETTINGS: MyObsidianLilyPondSettings = {
+	lilyPondFolderName: '_lilyPond',
+	lilyPondLogLevel: 'ERROR',
+}
+
+// Turns on/off console debug lines.
+const DEBUG = false;
+
+function log(msg) {
+	if (DEBUG) {
+		console.log(msg);
+	}
 }
 
 export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+	settings: MyObsidianLilyPondSettings;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+		this.registerMarkdownCodeBlockProcessor("lilypond", async (source, el, ctx) => {
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
+			log(source);
+			///////////////////////////////////////////////////////////////////////////////////////
+			//	Empty Block and Filename Check
+			///////////////////////////////////////////////////////////////////////////////////////
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
+			if (source.trim().length == 0) {
+				const lilyPondCachedDiv = el.createDiv();
+				lilyPondCachedDiv.innerText = "Empty LilyPond block - Please add some LilyPond!";
+				return;
 			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
+			if (!source.startsWith("%") || !source.split("\n", 1)[0].trim()) {
+				const lilyPondCachedDiv = el.createDiv();
+				lilyPondCachedDiv.innerHTML = "Your block must start with a comment naming this block, and this name must be unique within this note, like: <pre>% MyScore</pre>";
+				return;
+			}
+
+
+			// Check to ensure we have at least 2 lines, and the first starts with a %.
+			if (source.startsWith("%") && source.split("\n", 1)[0].trim() && (source.trim().split("\n").length == 1)) {
+				const lilyPondCachedDiv = el.createDiv();
+				lilyPondCachedDiv.innerText = "Filename set, time to write some Lilypond!";
+				return;
+			}
+
+			
+			// Check to ensure the user is not working in a comment line, which means there's no need to process things.
+			// Additionally, this helps to ensure if the user is editing the filename, we're not starting to generate stuff with the wrong filename.
+			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+			if (view !== null) {
+				const line = view.editor.getCursor().line;
+				const lineContent = view.editor.getLine(line);
+				if (lineContent.trim().startsWith("%")) {
+					return;
 				}
 			}
+
+			///////////////////////////////////////////////////////////////////////////////////////
+			//	Path Variable Setups:
+			//  Now, let's set up variables to help us understanding the notes and paths we're
+			//  reading from and writing to.
+			///////////////////////////////////////////////////////////////////////////////////////
+
+			// Identify the base path of the vault and the active file path.
+			//@ts-ignore
+			const vaultBasePath = this.app.vault.adapter.basePath;
+			log('vaultBasePath: ' + vaultBasePath)
+
+			// Get the path from root, no preceding filename.
+			const active_note_file_path = this.app.workspace.getActiveFile()?.path;
+
+			if (active_note_file_path == null) {
+				log("Error! Active File Path is null.");
+				return;
+			}
+
+			//Get the path from root (no preceding slash, no filename)
+			const active_folder_path = active_note_file_path.substring(0, active_note_file_path.lastIndexOf("/"));
+
+			// Get the note name without the .md extension. Used later for naming lilypond files. 
+			const note_name_no_ext = this.app.workspace.getActiveFile()?.basename;
+
+			// Determine the .ly source filename for this codeblock.
+			const dotLYSourceFileNameNoExtension = `${note_name_no_ext}_${source.split("\n")[0].substring(1).trim()}`;
+			const dotLYSourceFileNameWithExtension = `${dotLYSourceFileNameNoExtension}.ly`;
+
+			// Without the check on active_path, if we were in the root directory, there'd be a preceding slash that 
+			// impacts the call to getAbstractFileByPath.
+			const dotLYSourceFilePath = active_folder_path != "" ?
+				`${this.settings.lilyPondFolderName}/${active_folder_path}/${dotLYSourceFileNameWithExtension}` :
+				`${this.settings.lilyPondFolderName}/${dotLYSourceFileNameWithExtension}`;
+
+			// Set here so it's accessible in the lilypond exec callback.
+			const settingsLilyPondFolderName = this.settings.lilyPondFolderName;
+
+			log(`active_note_file_path:\n${active_note_file_path}`); // path + filename
+			log(`active_folder_path:\n${active_folder_path}`); // path from root (no preceding slash)
+			log(`note_name_no_ext:\n${note_name_no_ext}`); // Just the note name without .md.
+
+			///////////////////////////////////////////////////////////////////////////////////////
+			//	Cached LilyPond Loading
+			//    Since LilyPond takes a bit to compile, when the codeblock first loads in view mode
+			//    find the last generated LilyPond output to show while it gets recompiled.
+			///////////////////////////////////////////////////////////////////////////////////////
+
+			const lilyPondCachedDiv = el.createDiv();
+
+
+			// This was a little odd to get working, as relative image paths don't work. 
+			// Followed a thread here to identify the right url structure:
+			// 		https://forum.obsidian.md/t/img-tag-with-relative-file-path/18647/15
+			// 		<img src="app://local/absolute/path/to/your/vault/path/to/your/image.jpg" />
+			// 		where local is hardcoded.
+
+			const lilyPondImagePreviewFilePath = active_folder_path == "" ?
+				`${settingsLilyPondFolderName}/${dotLYSourceFileNameNoExtension}.preview.png` :
+				`${settingsLilyPondFolderName}/${active_folder_path}/${dotLYSourceFileNameNoExtension}.preview.png`;
+
+			const lilyPondAbsolutePreviewURI = `app://local/${app.vault.adapter.basePath}/${lilyPondImagePreviewFilePath}`;
+
+			const lilyPondMidiFilePath = active_folder_path == "" ?
+				`${settingsLilyPondFolderName}/${dotLYSourceFileNameNoExtension}.mid` :
+				`${settingsLilyPondFolderName}/${active_folder_path}/${dotLYSourceFileNameNoExtension}.mid`;
+
+
+			// Load the png preview if it exists already.
+			if (this.app.vault.getAbstractFileByPath(lilyPondImagePreviewFilePath) != null) {
+				const lilyPondCachedImage = lilyPondCachedDiv.createEl("img");
+				// Inject a random query string, otherwise the image gets cached by the "browser" and not reloaded from the newly generated file.
+				lilyPondCachedImage.src = lilyPondAbsolutePreviewURI + "?ver=" + getRandomInt(999999);
+			}
+
+			// Load the midi file if it exists. MIDI support is not currently working and will likely require custom JS via WebAudio or WebMIDI to work.
+			const lilyPondAbsoluteMidiURI = `obsidian://open?vault=${app.vault.getName()}&file=${encodeURI(lilyPondMidiFilePath)}`
+			const lilyPondMidiFile = this.app.vault.getAbstractFileByPath(lilyPondMidiFilePath);
+
+
+			const lilyPondMidiLinkDiv = lilyPondCachedDiv.createDiv();
+
+
+			if (lilyPondMidiFile != null) {
+				// const lilyPondCachedMidiAudioEl = lilyPondCachedDiv.createEl("audio");
+				// // Inject a random query string, otherwise the image gets cached by the "browser" and not reloaded from the newly generated file.
+				// const lilyPondCachedMidiAudioSrcEl = lilyPondCachedMidiAudioEl.createEl("source");
+				// lilyPondCachedMidiAudioSrcEl.src = lilyPondAbsoluteMidiURI + "?ver=" + getRandomInt(999999);
+				// lilyPondCachedMidiAudioSrcEl.type = "audio/midi";
+
+				const lilyPondMidiLink = lilyPondMidiLinkDiv.createEl("a");
+				lilyPondMidiLink.href = lilyPondAbsoluteMidiURI;
+				lilyPondMidiLink.innerText = "MIDI File";
+			}
+
+			///////////////////////////////////////////////////////////////////////////////////////
+			//	Recompiliation check - 
+			//	  If the file already exists and there's no changes to the source, 
+			//    there's no need to recompile.
+			///////////////////////////////////////////////////////////////////////////////////////
+
+			const dotLySourceFile = this.app.vault.getAbstractFileByPath(dotLYSourceFilePath);
+			if (dotLySourceFile != null) {
+				//@ts-ignore
+				const lyCachedFileContents = await this.app.vault.read(dotLySourceFile);
+				if (lyCachedFileContents.trim() == source.trim()) {
+					log("No changes detect. No need to execute LilyPond. Exiting.")
+					return;
+				}
+			}
+
+			///////////////////////////////////////////////////////////////////////////////////////
+			//	Folder and .ly file Creation
+			///////////////////////////////////////////////////////////////////////////////////////
+			const lilyPondFolder = this.app.vault.getAbstractFileByPath(
+				active_folder_path == "" ?
+					this.settings.lilyPondFolderName :
+					`${this.settings.lilyPondFolderName}/${active_folder_path}`);
+
+			console.log(lilyPondFolder);
+
+			// Create the subfolder for the lilyPond files.
+			if (lilyPondFolder == null) {
+				await this.app.vault.createFolder(`${this.settings.lilyPondFolderName}/${active_folder_path}`);
+			}
+
+			let lilyPondSourceFile = this.app.vault.getAbstractFileByPath(dotLYSourceFilePath);
+
+			if (lilyPondSourceFile != null) {
+				await this.app.vault.delete(lilyPondSourceFile, true);
+			}
+			lilyPondSourceFile = await this.app.vault.create(dotLYSourceFilePath, source);
+
+			///////////////////////////////////////////////////////////////////////////////////////
+			//	LilyPond Execution
+			///////////////////////////////////////////////////////////////////////////////////////
+
+			lilyPondCachedDiv.innerText = "Compiling LilyPond...";
+
+			// Execute Lilypond in the appropriate directory.
+			// -dno-print-pages will suppress the primary output.
+			// -dpreview --png will create a png preview that won't be a full page size.
+			// --loglevel will set the loglevel to whatever's in the settings.
+			const lilyPondCommand = 'lilypond --png -dno-print-pages -dpreview '
+				+ "--loglevel=" + this.settings.lilyPondLogLevel
+				+ ' "' + dotLYSourceFileNameWithExtension + '"';
+
+			log(lilyPondCommand);
+
+
+			// Build the current working directory for LilyPond, which should be the subfolder specified in settings.
+			const lilyPondCurrentWorkingDirectory = active_folder_path == "" ?
+				vaultBasePath + "/" + this.settings.lilyPondFolderName :
+				vaultBasePath + "/" + this.settings.lilyPondFolderName + "/" + active_folder_path;
+
+			//@ts-ignore
+			const exec = require('child_process').exec;
+			exec(lilyPondCommand, {
+				//@ts-ignore
+				cwd: lilyPondCurrentWorkingDirectory // assigns the directory to execute lilypond in.
+			}, (error, stdout, stderr) => {
+				lilyPondCachedDiv.empty();
+				const lilyPondDiv = el.createDiv();
+
+				// If there was a problem with interpreting the lilypond source, populate the error text in the block.
+				if (error != null) {
+					lilyPondDiv.innerText = error;
+					if (lilyPondSourceFile != null) {
+						this.app.vault.delete(lilyPondSourceFile, true);
+					}
+				}
+				// Otherwise, show the preview image in the window.
+				else {
+
+					const lilyPondImage = lilyPondDiv.createEl("img");
+					// Inject a random query string, otherwise the image gets cached by the "browser" and not reloaded from the newly generated file.
+					lilyPondImage.src = lilyPondAbsolutePreviewURI + "?ver=" + getRandomInt(999999);
+
+					const lilyPondMidiFile = this.app.vault.getAbstractFileByPath(lilyPondMidiFilePath);
+
+					if (lilyPondMidiFile != null) {
+						const lilyPondMidiLinkDiv = lilyPondDiv.createDiv();
+						const lilyPondMidiLink = lilyPondMidiLinkDiv.createEl("a");
+						lilyPondMidiLink.href = lilyPondAbsoluteMidiURI;
+						lilyPondMidiLink.innerText = "MIDI File";
+					}
+
+				}
+				log(`error:\n${error}`);0.
+				log(`stdout:\n${stdout}`);
+				log(`stderr:\n${stderr}`);
+
+			});
+
 		});
+
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new LilyPondSettingTab(this.app, this));
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		// Sometimes there are leftover temp files in the directory. Let's find and remove those.
+		// This happens when lilypond is firing often due to real-time compilation on entry and 
+		// you have file conflicts.
+		// The pattern is tmp--tmp-{number}
+		this.registerInterval(window.setInterval(() => {
+
+			const allLoadedFiles = this.app.vault.getAllLoadedFiles();
+			const tempFiles = allLoadedFiles.filter(f => f.path.startsWith(this.settings.lilyPondFolderName + "/") && f.name.startsWith("tmp--tmp") && f.deleted == false);
+			log("Checking for tempfiles.");
+
+			for (let tempFile of tempFiles) {
+				log("Removing tempfile: " + tempFile);
+				app.vault.delete(tempFile);
+			}
+
+		}, 5 * 60 * 1000));
+
+
 	}
+
+
 
 	onunload() {
 
@@ -91,23 +300,12 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
+function getRandomInt(max : number) {
+	return Math.floor(Math.random() * max);
 }
 
-class SampleSettingTab extends PluginSettingTab {
+
+class LilyPondSettingTab extends PluginSettingTab {
 	plugin: MyPlugin;
 
 	constructor(app: App, plugin: MyPlugin) {
@@ -116,21 +314,33 @@ class SampleSettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const { containerEl } = this;
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
+		containerEl.createEl('h2', { text: 'Settings for LilyPond for Obsidian.' });
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
+			.setName('Output File Subfolder Name')
+			.setDesc('By default, .ly files and output from LilyPond compilation are stored in a lilyPond subfolder beneath your notes. You can change the name of the directory here. Do not start the directory name with "."')
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+				.setPlaceholder('_lilyPond')
+				.setValue(this.plugin.settings.lilyPondFolderName)
 				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
+					log('Secret: ' + value);
+					this.plugin.settings.lilyPondFolderName = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Log Level')
+			.setDesc('Change the Log Level of the LilyPond compiler here [NONE, ERROR, WARN, BASIC_PROGRESS, INFO, DEBUG')
+			.addText(text => text
+				.setPlaceholder('ERROR')
+				.setValue(this.plugin.settings.lilyPondLogLevel)
+				.onChange(async (value) => {
+					log('Secret: ' + value);
+					this.plugin.settings.lilyPondLogLevel = value;
 					await this.plugin.saveSettings();
 				}));
 	}
